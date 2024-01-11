@@ -4,20 +4,15 @@ sequence from a FASTA file
 """
 
 import argparse 
+import re
 
 def main():
-
     # Setup argparse to take file
     parser = argparse.ArgumentParser(description='A script that.')
     parser.add_argument('--sequence_file', '-sf', type=str, help='fasta file path')
     args = parser.parse_args()
     sequence = args.sequence_file
-    sequence_length = len(extract_sequence(sequence))
-    sequence_id = extract_id(sequence)
-    gc_total = count_gc(sequence)
-    gc_content = round(gc_total/sequence_length, 4)
-    print("The GC content of sequence " + sequence_id + " is " + str(gc_content*100) + "%")
-
+    output(sequence)
 # Open the text file in read mode
 def read_file(path: str) -> str:
     with open(path, 'r') as file:
@@ -25,36 +20,61 @@ def read_file(path: str) -> str:
         file_content = file.read()
     return file_content
 
+# extracts the ids in the fasta headers. Expects ">ID_" format.
+# TODO: consider changing this to accept different formats
+def extract_ids(seq: str) -> list:
+    file = read_file(seq)
+    id_regex = r'>([^_]+)_'
+    ids = re.findall(id_regex, file)
+    return ids
 
 # Convert the string to an array of characters
-def extract_sequence(seq: str) -> str:
-    nucleotides = ['A', 'C', 'G', 'T']
-    characters_array = list(read_file(seq))
-    sequence_array = []
-    for char in characters_array:
-        if char in nucleotides:
-            sequence_array.append(char) 
-    return ''.join(sequence_array) 
+def extract_sequences(seq: str) -> list:
+    file = read_file(seq)
+    sequence_regex = r'>[^\n]+\n([ACGT\n]+)'
+    sequences = re.findall(sequence_regex, file)
+    cleaned_sequences = [sequence.replace('\n', '') for sequence in sequences]
 
-def extract_id(seq: str) -> str:
-    nucleotides = ['A', 'C', 'G', 'T']
-    characters_array = list(read_file(seq))
-    id_array = []
-    for char in characters_array: 
-        if char == '_':
-            return ''.join(id_array)  
-        if char not in nucleotides and char != '\n':
-            id_array.append(char) 
-    
-    return ''.join(id_array) 
+    return cleaned_sequences
 
-def count_gc(seq: str) -> int:
-    sequence = extract_sequence(seq)
+# Creates dictionary with sequence ids as keys and sequences 
+# as values
+def sequence_dictionary(seq: str) -> dict:
+    ids = extract_ids(seq)
+    sequences = extract_sequences(seq)
+    seq_dict = {}
+    for i in range(len(sequences)):
+        seq_dict[ids[i]] = sequences[i]
+    return seq_dict 
+
+# Calculates gc percentage of a sequence string
+def gc_percentage(seq: str) -> int:
+    sequence_length = len(seq)
     gc_count = 0
-    for char in sequence:
+    for char in seq:
         if char == "G" or char == "C":
             gc_count += 1 
-    return gc_count
+    percent = (gc_count/sequence_length)*100
+    return round(percent, 2) 
+
+# Creates dictionary of sequence ids with their corresponding 
+# gc percentage
+def gc_content(seq:str) -> dict: 
+    seq_dict = sequence_dictionary(seq)
+    gc_dict = {} 
+    for key, value in seq_dict.items():
+        id = key
+        sequence = value
+        gc_percent = gc_percentage(sequence)
+        gc_dict[id] = str(gc_percent) + "%"
+    return gc_dict  
+
+def output(seq: str) -> None: 
+    percentage_dict = gc_content(seq)
+    for key, value in percentage_dict.items():
+        id = key
+        percentage = value
+        print("Sequence " + id + " has a GC content of " + percentage)
 
 if __name__ == "__main__":
     main()
